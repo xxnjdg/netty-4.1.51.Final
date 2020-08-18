@@ -18,11 +18,13 @@ package io.netty.buffer;
 import io.netty.util.internal.PlatformDependent;
 
 import java.nio.ByteBuffer;
-
+/**
+ * 创建一个指定内存地址的UnpooledUnsafeDirectByteBuf，该内存块可能已被写入数据以减少一步拷贝操作。
+ */
 final class WrappedUnpooledUnsafeDirectByteBuf extends UnpooledUnsafeDirectByteBuf {
-
+    // 基于 memoryAddress 内存地址，创建 Direct ByteBuf 对象
     WrappedUnpooledUnsafeDirectByteBuf(ByteBufAllocator alloc, long memoryAddress, int size, boolean doFree) {
-        super(alloc, PlatformDependent.directBuffer(memoryAddress, size), size, doFree);
+        super(alloc, PlatformDependent.directBuffer(memoryAddress, size)/** 创建 Direct ByteBuf 对象 **/, size, doFree);
     }
 
     @Override

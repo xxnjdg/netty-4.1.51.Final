@@ -39,7 +39,7 @@ import java.nio.charset.Charset;
  */
 class WrappedByteBuf extends ByteBuf {
 
-    protected final ByteBuf buf;
+    protected final ByteBuf buf;//被装饰的 ByteBuf 对象
 
     protected WrappedByteBuf(ByteBuf buf) {
         this.buf = ObjectUtil.checkNotNull(buf, "buf");

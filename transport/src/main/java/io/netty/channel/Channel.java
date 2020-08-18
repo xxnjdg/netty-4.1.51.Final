@@ -106,11 +106,17 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
 
     /**
      * Returns {@code true} if the {@link Channel} is registered with an {@link EventLoop}.
+     * true 表示 Channel 已注册到 EventLoop 上
+     * false 表示 Channel 未注册到 EventLoop 上
      */
     boolean isRegistered();
 
     /**
      * Return {@code true} if the {@link Channel} is active and so connected.
+     * Channel 是否激活
+     *
+     * 对于服务端 ServerSocketChannel ，true 表示 Channel 已经绑定到端口上，可提供服务
+     * 对于客户端 SocketChannel ，true 表示 Channel 连接到远程服务器
      */
     boolean isActive();
 
@@ -157,18 +163,22 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
      * requested write operation immediately.  Any write requests made when
      * this method returns {@code false} are queued until the I/O thread is
      * ready to process the queued write requests.
+     *
+     * 当 Channel 的写缓存区 outbound 非 null 且可写时，返回 true
      */
     boolean isWritable();
 
     /**
      * Get how many bytes can be written until {@link #isWritable()} returns {@code false}.
      * This quantity will always be non-negative. If {@link #isWritable()} is {@code false} then 0.
+     * 获得距离不可写还有多少字节数
      */
     long bytesBeforeUnwritable();
 
     /**
      * Get how many bytes must be drained from underlying buffers until {@link #isWritable()} returns {@code true}.
      * This quantity will always be non-negative. If {@link #isWritable()} is {@code true} then 0.
+     * 获得距离可写还要多少字节数
      */
     long bytesBeforeWritable();
 

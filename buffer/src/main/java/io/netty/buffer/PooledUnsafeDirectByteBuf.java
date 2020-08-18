@@ -26,6 +26,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
+/**
+ * 基于 ByteBuffer + Unsafe 的可重用 ByteBuf 实现类。所以，泛型 T 为 ByteBuffer
+ */
 final class PooledUnsafeDirectByteBuf extends PooledByteBuf<ByteBuffer> {
     private static final ObjectPool<PooledUnsafeDirectByteBuf> RECYCLER = ObjectPool.newPool(
             new ObjectCreator<PooledUnsafeDirectByteBuf>() {
@@ -50,16 +53,17 @@ final class PooledUnsafeDirectByteBuf extends PooledByteBuf<ByteBuffer> {
     @Override
     void init(PoolChunk<ByteBuffer> chunk, ByteBuffer nioBuffer,
               long handle, int offset, int length, int maxLength, PoolThreadCache cache) {
-        super.init(chunk, nioBuffer, handle, offset, length, maxLength, cache);
-        initMemoryAddress();
+        super.init(chunk, nioBuffer, handle, offset, length, maxLength, cache);// 调用父初始化方法
+        initMemoryAddress();// 初始化内存地址
     }
 
     @Override
     void initUnpooled(PoolChunk<ByteBuffer> chunk, int length) {
-        super.initUnpooled(chunk, length);
-        initMemoryAddress();
+        super.initUnpooled(chunk, length);// 调用父初始化方法
+        initMemoryAddress();// 初始化内存地址
     }
 
+    //获得 ByteBuffer 对象的起始内存地址
     private void initMemoryAddress() {
         memoryAddress = PlatformDependent.directBufferAddress(memory) + offset;
     }
@@ -248,7 +252,8 @@ final class PooledUnsafeDirectByteBuf extends PooledByteBuf<ByteBuffer> {
 
     @Override
     protected SwappedByteBuf newSwappedByteBuf() {
-        if (PlatformDependent.isUnaligned()) {
+        if (PlatformDependent.isUnaligned()) {// 支持
+            //对于 Linux 环境下，一般是支持 unaligned access( 对齐访问 )，所以返回的是 UnsafeDirectSwappedByteBuf 对象
             // Only use if unaligned access is supported otherwise there is no gain.
             return new UnsafeDirectSwappedByteBuf(this);
         }

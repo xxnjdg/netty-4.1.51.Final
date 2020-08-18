@@ -44,10 +44,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(AbstractChannel.class);
 
-    private final Channel parent;
-    private final ChannelId id;
-    private final Unsafe unsafe;
-    private final DefaultChannelPipeline pipeline;
+    private final Channel parent;//父 Channel 对象。对于 NioServerSocketChannel 的 parent 为空。
+    private final ChannelId id;//Channel 编号对象。在构造方法中，通过调用 #newId() 方法，进行创建
+    private final Unsafe unsafe;//Unsafe 对象。在构造方法中，通过调用 #newUnsafe() 方法，进行创建
+    private final DefaultChannelPipeline pipeline;//DefaultChannelPipeline 对象。在构造方法中，通过调用 #newChannelPipeline() 方法，进行创建
     private final VoidChannelPromise unsafeVoidPromise = new VoidChannelPromise(this, false);
     private final CloseFuture closeFuture = new CloseFuture(this);
 
@@ -413,6 +413,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     /**
      * {@link Unsafe} implementation which sub-classes must extend and use.
+     * 将数据写到内存队列中
      */
     protected abstract class AbstractUnsafe implements Unsafe {
 
@@ -462,8 +463,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 设置 Channel 的 eventLoop 属性
             AbstractChannel.this.eventLoop = eventLoop;
 
+            // 在 EventLoop 中执行注册逻辑
             if (eventLoop.inEventLoop()) {
                 register0(promise);
             } else {
@@ -492,17 +495,19 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 if (!promise.setUncancellable() || !ensureOpen(promise)) {
                     return;
                 }
-                boolean firstRegistration = neverRegistered;
-                doRegister();
-                neverRegistered = false;
-                registered = true;
+                boolean firstRegistration = neverRegistered;// 记录是否为首次注册
+                doRegister();// 执行注册逻辑
+                neverRegistered = false;// 标记首次注册为 false
+                registered = true;// 标记 Channel 为已注册
 
                 // Ensure we call handlerAdded(...) before we actually notify the promise. This is needed as the
                 // user may already fire events through the pipeline in the ChannelFutureListener.
+                // 确保在实际通知诺言之前，先调用handlerAdded（...）。 这是需要的，
+                // 因为用户可能已经通过ChannelFutureListener中的管道触发了事件。
                 pipeline.invokeHandlerAddedIfNeeded();
 
-                safeSetSuccess(promise);
-                pipeline.fireChannelRegistered();
+                safeSetSuccess(promise);// 回调通知 `promise` 执行成功
+                pipeline.fireChannelRegistered();// 触发通知已注册事件
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
                 if (isActive()) {
@@ -526,6 +531,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void bind(final SocketAddress localAddress, final ChannelPromise promise) {
+            // 判断是否在 EventLoop 的线程中。
             assertEventLoop();
 
             if (!promise.setUncancellable() || !ensureOpen(promise)) {
@@ -545,7 +551,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                         "address (" + localAddress + ") anyway as requested.");
             }
 
+            // 记录 Channel 是否激活
             boolean wasActive = isActive();
+            // 绑定 Channel 的端口
             try {
                 doBind(localAddress);
             } catch (Throwable t) {
@@ -554,6 +562,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 若 Channel 是新激活的，触发通知 Channel 已激活的事件。
             if (!wasActive && isActive()) {
                 invokeLater(new Runnable() {
                     @Override
@@ -563,6 +572,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 });
             }
 
+            // 回调通知 promise 执行成功
             safeSetSuccess(promise);
         }
 
@@ -857,12 +867,15 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             assertEventLoop();
 
             ChannelOutboundBuffer outboundBuffer = this.outboundBuffer;
+            // 内存队列为空
             if (outboundBuffer == null) {
+                // 内存队列为空，一般是 Channel 已经关闭，所以通知 Promise 异常结果
                 // If the outboundBuffer is null we know the channel was closed and so
                 // need to fail the future right away. If it is not null the handling of the rest
                 // will be done in flush0()
                 // See https://github.com/netty/netty/issues/2362
                 safeSetFailure(promise, newClosedChannelException(initialCloseCause));
+                // 释放消息( 对象 )相关的资源
                 // release message now to prevent resource-leak
                 ReferenceCountUtil.release(msg);
                 return;
@@ -870,47 +883,54 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             int size;
             try {
+                // 过滤写入的消息( 数据 )
                 msg = filterOutboundMessage(msg);
+                // 计算消息的长度
                 size = pipeline.estimatorHandle().size(msg);
                 if (size < 0) {
                     size = 0;
                 }
             } catch (Throwable t) {
+                // 通知 Promise 异常结果
                 safeSetFailure(promise, t);
+                // 释放消息( 对象 )相关的资源
                 ReferenceCountUtil.release(msg);
                 return;
             }
 
+            // 写入消息( 数据 )到内存队列
             outboundBuffer.addMessage(msg, size, promise);
         }
-
+        //刷新内存队列，将其中的数据写入到对端
         @Override
         public final void flush() {
             assertEventLoop();
-
+            // 内存队列为 null ，一般是 Channel 已经关闭，所以直接返回
             ChannelOutboundBuffer outboundBuffer = this.outboundBuffer;
             if (outboundBuffer == null) {
                 return;
             }
-
+            // 标记内存队列开始 flush
             outboundBuffer.addFlush();
-            flush0();
+            flush0();// 执行 flush
         }
 
         @SuppressWarnings("deprecation")
         protected void flush0() {
-            if (inFlush0) {
+            if (inFlush0) {// 正在 flush 中，所以直接返回
                 // Avoid re-entrance
                 return;
             }
 
+            // 内存队列为 null ，一般是 Channel 已经关闭，所以直接返回。
+            // 内存队列为空，无需 flush ，所以直接返回
             final ChannelOutboundBuffer outboundBuffer = this.outboundBuffer;
             if (outboundBuffer == null || outboundBuffer.isEmpty()) {
                 return;
             }
-
+            // 标记正在 flush 中
             inFlush0 = true;
-
+            // 若未激活，通知 flush 失败
             // Mark all pending write requests as failure if the channel is inactive.
             if (!isActive()) {
                 try {
@@ -921,13 +941,13 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                         outboundBuffer.failFlushed(newClosedChannelException(initialCloseCause), false);
                     }
                 } finally {
-                    inFlush0 = false;
+                    inFlush0 = false;// 标记不在 flush 中。
                 }
                 return;
             }
 
             try {
-                doWrite(outboundBuffer);
+                doWrite(outboundBuffer);// 执行真正的写入到对端
             } catch (Throwable t) {
                 if (t instanceof IOException && config().isAutoClose()) {
                     /**
@@ -949,7 +969,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     }
                 }
             } finally {
-                inFlush0 = false;
+                inFlush0 = false;// 标记不在 flush 中。
             }
         }
 

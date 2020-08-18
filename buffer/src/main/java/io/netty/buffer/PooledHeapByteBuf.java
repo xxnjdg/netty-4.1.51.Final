@@ -24,6 +24,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
+/**
+ * 基于 ByteBuffer 的可重用 ByteBuf 实现类。所以，泛型 T 为 byte[]
+ */
 class PooledHeapByteBuf extends PooledByteBuf<byte[]> {
 
     private static final ObjectPool<PooledHeapByteBuf> RECYCLER = ObjectPool.newPool(
@@ -211,8 +214,8 @@ class PooledHeapByteBuf extends PooledByteBuf<byte[]> {
     @Override
     public final ByteBuf copy(int index, int length) {
         checkIndex(index, length);
-        ByteBuf copy = alloc().heapBuffer(length, maxCapacity());
-        return copy.writeBytes(memory, idx(index), length);
+        ByteBuf copy = alloc().heapBuffer(length, maxCapacity());// 创建一个 Heap ByteBuf 对象
+        return copy.writeBytes(memory, idx(index), length);// 写入数据
     }
 
     @Override

@@ -34,14 +34,19 @@ import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
  * A NIO {@link ByteBuffer} based buffer. It is recommended to use
  * {@link UnpooledByteBufAllocator#directBuffer(int, int)}, {@link Unpooled#directBuffer(int)} and
  * {@link Unpooled#wrappedBuffer(ByteBuffer)} instead of calling the constructor explicitly.
+ *
+ * 非池化 ByteBuf 实现类
  */
 public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
 
-    private final ByteBufAllocator alloc;
+    private final ByteBufAllocator alloc;//ByteBuf 分配器对象
 
-    ByteBuffer buffer; // accessed by UnpooledUnsafeNoCleanerDirectByteBuf.reallocateDirect()
-    private ByteBuffer tmpNioBuf;
-    private int capacity;
+    ByteBuffer buffer; // accessed by UnpooledUnsafeNoCleanerDirectByteBuf.reallocateDirect() //数据 ByteBuffer 对象
+    private ByteBuffer tmpNioBuf;//临时 ByteBuffer 对象
+    private int capacity;//容量
+    //是否需要释放 <1>
+    //如果 {@link #buffer} 从外部传入，则需要进行释放，即
+    // {@link #UnpooledDirectByteBuf(ByteBufAllocator, ByteBuffer, int)} 构造方法。
     private boolean doNotFree;
 
     /**
@@ -51,6 +56,7 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
      * @param maxCapacity     the maximum capacity of the underlying direct buffer
      */
     public UnpooledDirectByteBuf(ByteBufAllocator alloc, int initialCapacity, int maxCapacity) {
+        // 设置最大容量
         super(maxCapacity);
         ObjectUtil.checkNotNull(alloc, "alloc");
         checkPositiveOrZero(initialCapacity, "initialCapacity");
@@ -61,6 +67,8 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
         }
 
         this.alloc = alloc;
+        // 创建 Direct ByteBuffer 对象
+        // 设置数据 ByteBuffer 对象
         setByteBuffer(allocateDirect(initialCapacity), false);
     }
 
@@ -75,7 +83,7 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
 
     UnpooledDirectByteBuf(ByteBufAllocator alloc, ByteBuffer initialBuffer,
             int maxCapacity, boolean doFree, boolean slice) {
-        super(maxCapacity);
+        super(maxCapacity);// 设置最大容量
         ObjectUtil.checkNotNull(alloc, "alloc");
         ObjectUtil.checkNotNull(initialBuffer, "initialBuffer");
         if (!initialBuffer.isDirect()) {
@@ -85,15 +93,19 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
             throw new IllegalArgumentException("initialBuffer is a read-only buffer.");
         }
 
-        int initialCapacity = initialBuffer.remaining();
+        int initialCapacity = initialBuffer.remaining();// 获得剩余可读字节数，作为初始容量大小 <2>
         if (initialCapacity > maxCapacity) {
             throw new IllegalArgumentException(String.format(
                     "initialCapacity(%d) > maxCapacity(%d)", initialCapacity, maxCapacity));
         }
 
         this.alloc = alloc;
+        // 标记为 true 。因为 initialBuffer 是从外部传递进来，释放的工作，不交给当前 UnpooledDirectByteBuf 对象。
         doNotFree = !doFree;
+        // slice 切片
+        // 设置数据 ByteBuffer 对象
         setByteBuffer((slice ? initialBuffer.slice() : initialBuffer).order(ByteOrder.BIG_ENDIAN), false);
+        // 设置写索引 <2>
         writerIndex(initialCapacity);
     }
 
@@ -115,17 +127,18 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
         if (tryFree) {
             ByteBuffer oldBuffer = this.buffer;
             if (oldBuffer != null) {
+                // 标记为 false 。因为设置的 ByteBuffer 对象，是 UnpooledDirectByteBuf 自己创建的
                 if (doNotFree) {
                     doNotFree = false;
                 } else {
-                    freeDirect(oldBuffer);
+                    freeDirect(oldBuffer);// 释放老的 buffer 对象
                 }
             }
         }
 
         this.buffer = buffer;
-        tmpNioBuf = null;
-        capacity = buffer.remaining();
+        tmpNioBuf = null;// 重置 tmpNioBuf 为 null
+        capacity = buffer.remaining();// 设置容量
     }
 
     @Override
@@ -138,9 +151,10 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
         return capacity;
     }
 
+    //调整容量大小。在这个过程中，根据情况，可能对 buffer 扩容或缩容
     @Override
     public ByteBuf capacity(int newCapacity) {
-        checkNewCapacity(newCapacity);
+        checkNewCapacity(newCapacity);// 校验新的容量，不能超过最大容量
         int oldCapacity = capacity;
         if (newCapacity == oldCapacity) {
             return this;
@@ -633,6 +647,7 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
         return ((ByteBuffer) buffer.duplicate().position(index).limit(index + length)).slice();
     }
 
+    //当引用计数为 0 时，调用该方法，进行内存回收
     @Override
     protected void deallocate() {
         ByteBuffer buffer = this.buffer;
@@ -642,7 +657,7 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
 
         this.buffer = null;
 
-        if (!doNotFree) {
+        if (!doNotFree) {// 释放 buffer 对象
             freeDirect(buffer);
         }
     }

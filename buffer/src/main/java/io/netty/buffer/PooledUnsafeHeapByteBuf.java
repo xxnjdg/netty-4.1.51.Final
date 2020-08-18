@@ -20,6 +20,9 @@ import io.netty.util.internal.ObjectPool.Handle;
 import io.netty.util.internal.ObjectPool.ObjectCreator;
 import io.netty.util.internal.PlatformDependent;
 
+/**
+ * 实现 PooledHeapByteBuf 类，在 PooledHeapByteBuf 的基础上，基于 Unsafe 的可重用 ByteBuf 实现类。所以，泛型 T 为 byte[]
+ */
 final class PooledUnsafeHeapByteBuf extends PooledHeapByteBuf {
 
     private static final ObjectPool<PooledUnsafeHeapByteBuf> RECYCLER = ObjectPool.newPool(

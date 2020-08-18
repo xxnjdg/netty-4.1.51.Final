@@ -50,8 +50,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(AbstractNioChannel.class);
 
-    private final SelectableChannel ch;
-    protected final int readInterestOp;
+    private final SelectableChannel ch;//Java 原生 NIO Channel serverSocketChannel
+    protected final int readInterestOp;//ch 在选择器监听的事件
     volatile SelectionKey selectionKey;
     boolean readPending;
     private final Runnable clearReadPendingRunnable = new Runnable() {
@@ -363,7 +363,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
         private boolean isFlushPending() {
             SelectionKey selectionKey = selectionKey();
-            return selectionKey.isValid() && (selectionKey.interestOps() & SelectionKey.OP_WRITE) != 0;
+            return selectionKey.isValid() // 合法
+                    && (selectionKey.interestOps() & SelectionKey.OP_WRITE) != 0;// 对 SelectionKey.OP_WRITE 事件不感兴趣。
         }
     }
 

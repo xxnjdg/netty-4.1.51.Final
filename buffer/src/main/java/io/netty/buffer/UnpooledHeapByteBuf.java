@@ -34,12 +34,14 @@ import static io.netty.util.internal.ObjectUtil.checkNotNull;
  * Big endian Java heap buffer implementation. It is recommended to use
  * {@link UnpooledByteBufAllocator#heapBuffer(int, int)}, {@link Unpooled#buffer(int)} and
  * {@link Unpooled#wrappedBuffer(byte[])} instead of calling the constructor explicitly.
+ *
+ * 对应  PooledHeapByteBuf 的非池化 ByteBuf 实现类。
  */
 public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
 
-    private final ByteBufAllocator alloc;
-    byte[] array;
-    private ByteBuffer tmpNioBuf;
+    private final ByteBufAllocator alloc;//ByteBuf 分配器对象
+    byte[] array;//字节数组
+    private ByteBuffer tmpNioBuf;//临时 ByteBuff 对象
 
     /**
      * Creates a new heap buffer with a newly allocated byte array.
@@ -48,7 +50,7 @@ public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
      * @param maxCapacity the max capacity of the underlying byte array
      */
     public UnpooledHeapByteBuf(ByteBufAllocator alloc, int initialCapacity, int maxCapacity) {
-        super(maxCapacity);
+        super(maxCapacity);// 设置最大容量
 
         if (initialCapacity > maxCapacity) {
             throw new IllegalArgumentException(String.format(
@@ -56,8 +58,8 @@ public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
         }
 
         this.alloc = checkNotNull(alloc, "alloc");
-        setArray(allocateArray(initialCapacity));
-        setIndex(0, 0);
+        setArray(allocateArray(initialCapacity));// 创建并设置字节数组
+        setIndex(0, 0);// 设置读写索引
     }
 
     /**
@@ -67,7 +69,7 @@ public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
      * @param maxCapacity the max capacity of the underlying byte array
      */
     protected UnpooledHeapByteBuf(ByteBufAllocator alloc, byte[] initialArray, int maxCapacity) {
-        super(maxCapacity);
+        super(maxCapacity);// 设置最大容量
 
         checkNotNull(alloc, "alloc");
         checkNotNull(initialArray, "initialArray");
@@ -77,8 +79,8 @@ public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
         }
 
         this.alloc = alloc;
-        setArray(initialArray);
-        setIndex(0, initialArray.length);
+        setArray(initialArray);// 设置字节数组
+        setIndex(0, initialArray.length);// 设置读写索引
     }
 
     protected byte[] allocateArray(int initialCapacity) {
@@ -114,6 +116,7 @@ public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
         return array.length;
     }
 
+    //调整容量大小。在这个过程中，根据情况，可能对 array 扩容或缩容
     @Override
     public ByteBuf capacity(int newCapacity) {
         checkNewCapacity(newCapacity);
@@ -545,8 +548,8 @@ public class UnpooledHeapByteBuf extends AbstractReferenceCountedByteBuf {
 
     @Override
     protected void deallocate() {
-        freeArray(array);
-        array = EmptyArrays.EMPTY_BYTES;
+        freeArray(array);// 释放老数组
+        array = EmptyArrays.EMPTY_BYTES;// 设置为空字节数组
     }
 
     @Override

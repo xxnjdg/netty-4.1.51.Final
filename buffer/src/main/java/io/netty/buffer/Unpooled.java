@@ -692,11 +692,11 @@ public final class Unpooled {
     @Deprecated
     public static ByteBuf unmodifiableBuffer(ByteBuf buffer) {
         ByteOrder endianness = buffer.order();
-        if (endianness == BIG_ENDIAN) {
+        if (endianness == BIG_ENDIAN) {// 大端
             return new ReadOnlyByteBuf(buffer);
         }
 
-        return new ReadOnlyByteBuf(buffer.order(BIG_ENDIAN)).order(LITTLE_ENDIAN);
+        return new ReadOnlyByteBuf(buffer.order(BIG_ENDIAN)).order(LITTLE_ENDIAN);// 小端
     }
 
     /**

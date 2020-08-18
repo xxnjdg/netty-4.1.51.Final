@@ -29,8 +29,8 @@ class SimpleLeakAwareByteBuf extends WrappedByteBuf {
      * is called this object will be used as the argument. It is also assumed that this object is used when
      * {@link ResourceLeakDetector#track(Object)} is called to create {@link #leak}.
      */
-    private final ByteBuf trackedByteBuf;
-    final ResourceLeakTracker<ByteBuf> leak;
+    private final ByteBuf trackedByteBuf;//关联的 ByteBuf 对象
+    final ResourceLeakTracker<ByteBuf> leak;//ResourceLeakTracker 对象
 
     SimpleLeakAwareByteBuf(ByteBuf wrapped, ByteBuf trackedByteBuf, ResourceLeakTracker<ByteBuf> leak) {
         super(wrapped);

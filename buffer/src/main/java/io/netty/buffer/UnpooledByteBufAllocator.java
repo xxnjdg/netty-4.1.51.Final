@@ -23,12 +23,13 @@ import java.nio.ByteBuffer;
 
 /**
  * Simplistic {@link ByteBufAllocator} implementation that does not pool anything.
+ * 普通的 ByteBuf 的分配器，不基于内存池。
  */
 public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator implements ByteBufAllocatorMetricProvider {
 
     private final UnpooledByteBufAllocatorMetric metric = new UnpooledByteBufAllocatorMetric();
-    private final boolean disableLeakDetector;
-    private final boolean noCleaner;
+    private final boolean disableLeakDetector;//是否禁用内存泄露检测功能
+    private final boolean noCleaner;//不使用 `io.netty.util.internal.Cleaner` 释放 Direct ByteBuf
 
     /**
      * Default instance which uses leak-detection for direct buffers.
@@ -56,7 +57,7 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
      *                            direct buffers when not explicit released.
      */
     public UnpooledByteBufAllocator(boolean preferDirect, boolean disableLeakDetector) {
-        this(preferDirect, disableLeakDetector, PlatformDependent.useDirectBufferNoCleaner());
+        this(preferDirect, disableLeakDetector, PlatformDependent.useDirectBufferNoCleaner()/** 返回 true **/ );
     }
 
     /**
@@ -73,8 +74,8 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
     public UnpooledByteBufAllocator(boolean preferDirect, boolean disableLeakDetector, boolean tryNoCleaner) {
         super(preferDirect);
         this.disableLeakDetector = disableLeakDetector;
-        noCleaner = tryNoCleaner && PlatformDependent.hasUnsafe()
-                && PlatformDependent.hasDirectBufferNoCleanerConstructor();
+        noCleaner = tryNoCleaner && PlatformDependent.hasUnsafe() /** 返回 true **/
+                && PlatformDependent.hasDirectBufferNoCleanerConstructor();/** 返回 true **/
     }
 
     @Override
@@ -142,7 +143,7 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
         @Override
         protected byte[] allocateArray(int initialCapacity) {
             byte[] bytes = super.allocateArray(initialCapacity);
-            ((UnpooledByteBufAllocator) alloc()).incrementHeap(bytes.length);
+            ((UnpooledByteBufAllocator) alloc()).incrementHeap(bytes.length);// Metric ++
             return bytes;
         }
 
@@ -150,7 +151,7 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
         protected void freeArray(byte[] array) {
             int length = array.length;
             super.freeArray(array);
-            ((UnpooledByteBufAllocator) alloc()).decrementHeap(length);
+            ((UnpooledByteBufAllocator) alloc()).decrementHeap(length);// Metric --
         }
     }
 
@@ -162,7 +163,7 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
         @Override
         protected byte[] allocateArray(int initialCapacity) {
             byte[] bytes = super.allocateArray(initialCapacity);
-            ((UnpooledByteBufAllocator) alloc()).incrementHeap(bytes.length);
+            ((UnpooledByteBufAllocator) alloc()).incrementHeap(bytes.length);// Metric ++
             return bytes;
         }
 
@@ -170,7 +171,7 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
         protected void freeArray(byte[] array) {
             int length = array.length;
             super.freeArray(array);
-            ((UnpooledByteBufAllocator) alloc()).decrementHeap(length);
+            ((UnpooledByteBufAllocator) alloc()).decrementHeap(length);// Metric --
         }
     }
 
@@ -247,8 +248,8 @@ public final class UnpooledByteBufAllocator extends AbstractByteBufAllocator imp
     }
 
     private static final class UnpooledByteBufAllocatorMetric implements ByteBufAllocatorMetric {
-        final LongCounter directCounter = PlatformDependent.newLongCounter();
-        final LongCounter heapCounter = PlatformDependent.newLongCounter();
+        final LongCounter directCounter = PlatformDependent.newLongCounter();//Direct ByteBuf 占用内存大小
+        final LongCounter heapCounter = PlatformDependent.newLongCounter();//Heap ByteBuf 占用内存大小
 
         @Override
         public long usedHeapMemory() {

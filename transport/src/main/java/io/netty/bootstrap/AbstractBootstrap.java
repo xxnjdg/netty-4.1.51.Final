@@ -49,6 +49,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>When not used in a {@link ServerBootstrap} context, the {@link #bind()} methods are useful for connectionless
  * transports such as datagram (UDP).</p>
+ *
+ * B ：继承 AbstractBootstrap 类，用于表示自身的类型。
+ * C ：继承 Channel 类，表示表示创建的 Channel 类型。
  */
 public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C extends Channel> implements Cloneable {
     @SuppressWarnings("unchecked")
@@ -56,16 +59,16 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     @SuppressWarnings("unchecked")
     static final Map.Entry<AttributeKey<?>, Object>[] EMPTY_ATTRIBUTE_ARRAY = new Map.Entry[0];
 
-    volatile EventLoopGroup group;
+    volatile EventLoopGroup group;//bossGroup
     @SuppressWarnings("deprecation")
     private volatile ChannelFactory<? extends C> channelFactory;
-    private volatile SocketAddress localAddress;
+    private volatile SocketAddress localAddress;//本地地址
 
     // The order in which ChannelOptions are applied is important they may depend on each other for validation
     // purposes.
-    private final Map<ChannelOption<?>, Object> options = new LinkedHashMap<ChannelOption<?>, Object>();
-    private final Map<AttributeKey<?>, Object> attrs = new ConcurrentHashMap<AttributeKey<?>, Object>();
-    private volatile ChannelHandler handler;
+    private final Map<ChannelOption<?>, Object> options = new LinkedHashMap<ChannelOption<?>, Object>();//可选项集合
+    private final Map<AttributeKey<?>, Object> attrs = new ConcurrentHashMap<AttributeKey<?>, Object>();//属性集合
+    private volatile ChannelHandler handler;//处理器
 
     AbstractBootstrap() {
         // Disallow extending from a different package.
@@ -104,6 +107,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      * The {@link Class} which is used to create {@link Channel} instances from.
      * You either use this or {@link #channelFactory(io.netty.channel.ChannelFactory)} if your
      * {@link Channel} implementation has no no-args constructor.
+     *
+     * {@link Class}，用于从中创建{@link Channel}实例。
+     * 如果您的{@link Channel}实现没有no-args构造函数，则可以使用this或{@link #channelFactory（io.netty.channel.ChannelFactory）}。
      */
     public B channel(Class<? extends C> channelClass) {
         return channelFactory(new ReflectiveChannelFactory<C>(
@@ -139,6 +145,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
     /**
      * The {@link SocketAddress} which is used to bind the local "end" to.
+     * {@link SocketAddress}用于绑定本地“端”。
      */
     public B localAddress(SocketAddress localAddress) {
         this.localAddress = localAddress;
@@ -169,6 +176,10 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     /**
      * Allow to specify a {@link ChannelOption} which is used for the {@link Channel} instances once they got
      * created. Use a value of {@code null} to remove a previous set {@link ChannelOption}.
+     *
+     * 允许指定一个{@link ChannelOption}，该实例在创建后便用于{@link Channel}实例。 使用值{@code null}删除先前设置的{@link ChannelOption}。
+     *
+     * 设置创建 Channel 的可选项
      */
     public <T> B option(ChannelOption<T> option, T value) {
         ObjectUtil.checkNotNull(option, "option");
@@ -185,6 +196,12 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     /**
      * Allow to specify an initial attribute of the newly created {@link Channel}.  If the {@code value} is
      * {@code null}, the attribute of the specified {@code key} is removed.
+     *
+     * 允许指定新创建的{@link Channel}的初始属性。 如果{@code值}为{@code null}，则将删除指定的{@code键}的属性。
+     *
+     * 我们可以理解成 java.nio.channels.SelectionKey 的 attachment 属性，并且类型为 Map 。
+     *
+     * 设置创建 Channel 的属性
      */
     public <T> B attr(AttributeKey<T> key, T value) {
         ObjectUtil.checkNotNull(key, "key");
@@ -262,6 +279,8 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
     /**
      * Create a new {@link Channel} and bind it.
+     *
+     * 创建一个新的{@link Channel}并将其绑定。
      */
     public ChannelFuture bind(SocketAddress localAddress) {
         validate();
@@ -269,20 +288,25 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     private ChannelFuture doBind(final SocketAddress localAddress) {
+        // 初始化并注册一个 Channel 对象，因为注册是异步的过程，所以返回一个 ChannelFuture 对象。
         final ChannelFuture regFuture = initAndRegister();
         final Channel channel = regFuture.channel();
         if (regFuture.cause() != null) {
             return regFuture;
         }
 
-        if (regFuture.isDone()) {
+        // 绑定 Channel 的端口，并注册 Channel 到 SelectionKey 中。
+        if (regFuture.isDone()) {//
             // At this point we know that the registration was complete and successful.
+            // 至此，我们知道注册已完成且成功。
             ChannelPromise promise = channel.newPromise();
-            doBind0(regFuture, channel, localAddress, promise);
+            doBind0(regFuture, channel, localAddress, promise);// 绑定
             return promise;
         } else {
             // Registration future is almost always fulfilled already, but just in case it's not.
+            // 未来的注册几乎总是已经实现，但以防万一。
             final PendingRegistrationPromise promise = new PendingRegistrationPromise(channel);
+            //给 regFuture 添加监听
             regFuture.addListener(new ChannelFutureListener() {
                 @Override
                 public void operationComplete(ChannelFuture future) throws Exception {
@@ -290,13 +314,17 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
                     if (cause != null) {
                         // Registration on the EventLoop failed so fail the ChannelPromise directly to not cause an
                         // IllegalStateException once we try to access the EventLoop of the Channel.
+                        // 在EventLoop上的注册失败，因此一旦我们尝试访问Channel的EventLoop，就直接使ChannelPromise失败，
+                        // 不会导致IllegalStateException。
                         promise.setFailure(cause);
                     } else {
                         // Registration was successful, so set the correct executor to use.
                         // See https://github.com/netty/netty/issues/2586
+                        //注册成功，因此请设置要使用的正确执行器。
+                        //参见https://github.com/netty/netty/issues/2586
                         promise.registered();
 
-                        doBind0(regFuture, channel, localAddress, promise);
+                        doBind0(regFuture, channel, localAddress, promise);// 绑定
                     }
                 }
             });
@@ -307,7 +335,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
+            // 创建 Channel 对象
             channel = channelFactory.newChannel();
+            // 初始化 Channel 配置
             init(channel);
         } catch (Throwable t) {
             if (channel != null) {
@@ -320,6 +350,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);
         }
 
+        // 注册 Channel 到 EventLoopGroup 中
         ChannelFuture regFuture = config().group().register(channel);
         if (regFuture.cause() != null) {
             if (channel.isRegistered()) {
@@ -382,6 +413,8 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     /**
      * Returns the {@link AbstractBootstrapConfig} object that can be used to obtain the current config
      * of the bootstrap.
+     *
+     * 返回{@link AbstractBootstrapConfig}对象，该对象可用于获取引导程序的当前配置。
      */
     public abstract AbstractBootstrapConfig<B, C> config();
 
@@ -437,6 +470,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         }
     }
 
+    //设置传入的 Channel 的多个可选项
     static void setChannelOptions(
             Channel channel, Map.Entry<ChannelOption<?>, Object>[] options, InternalLogger logger) {
         for (Map.Entry<ChannelOption<?>, Object> e: options) {
